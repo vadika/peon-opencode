@@ -1,6 +1,6 @@
 # peon-opencode
 
-Voice line hooks for opencode with Linux, macOS, and WSL support.
+Voice line hooks for opencode with Linux, macOS, and WSL support. Inspired by https://peon-ping.vercel.app/ project.
 
 This is a refactor of peon-ping to work in a generic hook runner. The hook script reads a JSON event from stdin and plays a matching voice line, sets a terminal title, and optionally sends a desktop notification.
 
