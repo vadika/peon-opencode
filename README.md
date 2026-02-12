@@ -20,33 +20,13 @@ bash uninstall.sh
 
 ## Hook usage
 
-The installer registers a hook under `experimental.hook.session_completed`, but opencode 1.1.x ignores this config. For current versions, use the plugin (recommended) or the listener (headless server).
+The installer registers a hook under `experimental.hook.session_completed`, but opencode 1.1.x ignores this config. For current versions, use the plugin.
 
 ### Plugin (recommended for TUI)
 
 The installer drops a local plugin in `~/.config/opencode/plugins/peon-opencode.js`. Restart opencode to load it.
 
 The plugin listens for `session.created`, `session.completed`, `session.idle`, `session.error`, `permission.asked`, and `tool.execute.after` (errors only) and triggers the hook.
-
-### Listener (for serve/web)
-
-```bash
-OPENCODE_SERVER_URL=http://127.0.0.1:<port> ~/.opencode/hooks/peon-ping/peon-opencode-listener.py
-```
-
-If you know the server port you can set `OPENCODE_SERVER_PORT` instead. The listener also tries to auto-discover the port on Linux.
-
-If opencode is not exposing a TCP server, start it with an explicit port, for example:
-
-```bash
-opencode --port 6677
-```
-
-Then run:
-
-```bash
-OPENCODE_SERVER_PORT=6677 ~/.opencode/hooks/peon-ping/peon-opencode-listener.py
-```
 
 If you want to wire it manually (future versions), set:
 
