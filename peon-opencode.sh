@@ -21,15 +21,24 @@ PEON_DIR="${PEON_DIR:-$HOME/.opencode/hooks/peon-ping}"
 CONFIG="${PEON_CONFIG:-$PEON_DIR/config.json}"
 STATE="${PEON_STATE:-$PEON_DIR/.state.json}"
 PACKS_DIR="${PEON_PACKS_DIR:-$PEON_DIR/packs}"
+DEBUG_LOG="${PEON_DEBUG_LOG:-/tmp/peon-opencode-hook.log}"
+
+debug() {
+  if [ "${PEON_DEBUG:-0}" = "1" ]; then
+    printf '[%s] %s\n' "$(date -Is)" "$1" >> "$DEBUG_LOG"
+  fi
+}
 
 # --- Platform-aware audio playback ---
 play_sound() {
   local file="$1" vol="$2"
   case "$PLATFORM" in
     mac)
+      debug "play_sound mac: $file"
       nohup afplay -v "$vol" "$file" >/dev/null 2>&1 &
       ;;
     wsl)
+      debug "play_sound wsl: $file"
       local wpath
       wpath=$(wslpath -w "$file")
       wpath="${wpath//\\//}"
@@ -45,17 +54,65 @@ play_sound() {
       " &>/dev/null &
       ;;
     linux)
-      if command -v ffplay >/dev/null 2>&1; then
+      local backend="${PEON_AUDIO_PLAYER:-${AUDIO_PLAYER:-}}"
+      if [ -n "$backend" ]; then
+        case "$backend" in
+          paplay)
+            if command -v paplay >/dev/null 2>&1; then
+              debug "play_sound linux: paplay $file"
+              nohup paplay "$file" >/dev/null 2>&1 &
+              return
+            fi
+            ;;
+          ffplay)
+            if command -v ffplay >/dev/null 2>&1; then
+              debug "play_sound linux: ffplay $file"
+              local vol_pct
+              vol_pct=$(python3 -c "import sys; v=float('$vol'); v=max(0.0,min(1.0,v)); print(int(v*100))")
+              nohup ffplay -nodisp -autoexit -loglevel error -volume "$vol_pct" "$file" >/dev/null 2>&1 &
+              return
+            fi
+            ;;
+          aplay)
+            if command -v aplay >/dev/null 2>&1; then
+              debug "play_sound linux: aplay $file"
+              nohup aplay "$file" >/dev/null 2>&1 &
+              return
+            fi
+            ;;
+          mpg123)
+            if command -v mpg123 >/dev/null 2>&1; then
+              debug "play_sound linux: mpg123 $file"
+              nohup mpg123 -q "$file" >/dev/null 2>&1 &
+              return
+            fi
+            ;;
+          ogg123)
+            if command -v ogg123 >/dev/null 2>&1; then
+              debug "play_sound linux: ogg123 $file"
+              nohup ogg123 -q "$file" >/dev/null 2>&1 &
+              return
+            fi
+            ;;
+        esac
+      fi
+
+      if command -v paplay >/dev/null 2>&1; then
+        debug "play_sound linux: paplay $file"
+        nohup paplay "$file" >/dev/null 2>&1 &
+      elif command -v ffplay >/dev/null 2>&1; then
+        debug "play_sound linux: ffplay $file"
         local vol_pct
         vol_pct=$(python3 -c "import sys; v=float('$vol'); v=max(0.0,min(1.0,v)); print(int(v*100))")
         nohup ffplay -nodisp -autoexit -loglevel error -volume "$vol_pct" "$file" >/dev/null 2>&1 &
-      elif command -v paplay >/dev/null 2>&1; then
-        nohup paplay "$file" >/dev/null 2>&1 &
       elif command -v aplay >/dev/null 2>&1; then
+        debug "play_sound linux: aplay $file"
         nohup aplay "$file" >/dev/null 2>&1 &
       elif command -v mpg123 >/dev/null 2>&1; then
+        debug "play_sound linux: mpg123 $file"
         nohup mpg123 -q "$file" >/dev/null 2>&1 &
       elif command -v ogg123 >/dev/null 2>&1; then
+        debug "play_sound linux: ogg123 $file"
         nohup ogg123 -q "$file" >/dev/null 2>&1 &
       fi
       ;;
@@ -294,6 +351,7 @@ if str(cfg.get('enabled', True)).lower() == 'false':
     sys.exit(0)
 
 volume = cfg.get('volume', 0.5)
+audio_player = cfg.get('audio_player', '')
 active_pack = cfg.get('active_pack', 'peon')
 pack_rotation = cfg.get('pack_rotation', [])
 annoyed_threshold = int(cfg.get('annoyed_threshold', 3))
@@ -356,6 +414,7 @@ elif event_lower in ['stop','task_complete','task_done','complete','finished','s
     notify_color = 'blue'
     msg = project + ' - Task complete'
 elif event_lower in ['session.idle','session_idle']:
+    category = 'complete'
     status = 'done'
     marker = '* '
     notify = '1'
@@ -441,12 +500,14 @@ if state_dirty:
 print('PEON_EXIT=false')
 print('EVENT=' + q(event))
 print('VOLUME=' + q(str(volume)))
+print('AUDIO_PLAYER=' + q(str(audio_player)))
 print('PROJECT=' + q(project))
 print('STATUS=' + q(status))
 print('MARKER=' + q(marker))
 print('NOTIFY=' + q(notify))
 print('NOTIFY_COLOR=' + q(notify_color))
 print('MSG=' + q(msg))
+print('CATEGORY=' + q(category))
 print('SOUND_FILE=' + q(sound_file))
 " <<< "$INPUT" 2>/dev/null)"
 
@@ -458,6 +519,8 @@ if [ "$EVENT" = "SessionStart" ] || [ "${EVENT,,}" = "session_start" ]; then
   fi
 fi
 
+debug "event=$EVENT category=$CATEGORY paused=$PAUSED sound=$SOUND_FILE notify=$NOTIFY"
+
 TITLE="${MARKER}${PROJECT}: ${STATUS}"
 if [ -n "$TITLE" ]; then
   printf '\033]0;%s\007' "$TITLE"
@@ -465,6 +528,8 @@ fi
 
 if [ -n "$SOUND_FILE" ] && [ -f "$SOUND_FILE" ]; then
   play_sound "$SOUND_FILE" "$VOLUME"
+elif [ -n "$SOUND_FILE" ]; then
+  debug "sound missing: $SOUND_FILE"
 fi
 
 if [ -n "$NOTIFY" ] && [ "$PAUSED" != "true" ]; then

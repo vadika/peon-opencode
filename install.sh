@@ -4,6 +4,7 @@ set -euo pipefail
 
 INSTALL_DIR="${PEON_DIR:-$HOME/.opencode/hooks/peon-ping}"
 CONFIG_PATH="${OPENCODE_CONFIG:-$HOME/.config/opencode/opencode.json}"
+CONFIG_DIR="${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}"
 
 detect_platform() {
   case "$(uname -s)" in
@@ -61,7 +62,10 @@ fi
 mkdir -p "$INSTALL_DIR"
 
 cp "$SCRIPT_DIR/peon-opencode.sh" "$INSTALL_DIR/"
+cp "$SCRIPT_DIR/peon-opencode-listener.py" "$INSTALL_DIR/"
 cp "$SCRIPT_DIR/VERSION" "$INSTALL_DIR/"
+mkdir -p "$CONFIG_DIR/plugins"
+cp "$SCRIPT_DIR/peon-opencode-plugin.js" "$CONFIG_DIR/plugins/peon-opencode.js"
 
 if [ ! -f "$INSTALL_DIR/config.json" ]; then
   cp "$SCRIPT_DIR/config.json" "$INSTALL_DIR/"
@@ -71,6 +75,7 @@ mkdir -p "$INSTALL_DIR/packs"
 cp -r "$SCRIPT_DIR/packs/"* "$INSTALL_DIR/packs/"
 
 chmod +x "$INSTALL_DIR/peon-opencode.sh"
+chmod +x "$INSTALL_DIR/peon-opencode-listener.py"
 
 python3 -c "
 import json, os
@@ -120,6 +125,8 @@ fi
 echo ""
 echo "Hook command: $INSTALL_DIR/peon-opencode.sh"
 echo "Config file: $CONFIG_PATH"
+echo "Listener: $INSTALL_DIR/peon-opencode-listener.py"
+echo "Plugin: $CONFIG_DIR/plugins/peon-opencode.js"
 echo ""
 echo "Example event payloads (stdin JSON):"
 echo '  {"event":"session_start","cwd":"/path/to/project","session_id":"abc"}'
@@ -133,3 +140,9 @@ echo ""
 echo "CLI controls:"
 echo "  $INSTALL_DIR/peon-opencode.sh --toggle"
 echo "  $INSTALL_DIR/peon-opencode.sh --status"
+echo ""
+echo "Listener (recommended for opencode 1.1.x):"
+echo "  OPENCODE_SERVER_URL=http://127.0.0.1:<port> $INSTALL_DIR/peon-opencode-listener.py"
+echo ""
+echo "Plugin (recommended for opencode TUI):"
+echo "  Restart opencode to load $CONFIG_DIR/plugins/peon-opencode.js"

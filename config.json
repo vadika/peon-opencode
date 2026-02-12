@@ -2,6 +2,7 @@
   "enabled": true,
   "volume": 0.5,
   "active_pack": "peon",
+  "audio_player": "paplay",
   "pack_rotation": [],
   "annoyed_threshold": 3,
   "annoyed_window_seconds": 10,

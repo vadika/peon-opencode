@@ -10,7 +10,7 @@ This is a refactor of peon-ping to work in a generic hook runner. The hook scrip
 bash install.sh
 ```
 
-This copies files into `~/.opencode/hooks/peon-ping` by default and updates `~/.config/opencode/opencode.json` to register the hook. Override with `PEON_DIR` and `OPENCODE_CONFIG` if your setup uses different locations.
+This copies files into `~/.opencode/hooks/peon-ping` by default and updates `~/.config/opencode/opencode.json` to register the hook for future versions. Override with `PEON_DIR` and `OPENCODE_CONFIG` if your setup uses different locations.
 
 To remove:
 
@@ -20,7 +20,35 @@ bash uninstall.sh
 
 ## Hook usage
 
-The installer registers a hook under `experimental.hook.session_completed`. If you want to wire it manually, set:
+The installer registers a hook under `experimental.hook.session_completed`, but opencode 1.1.x ignores this config. For current versions, use the plugin (recommended) or the listener (headless server).
+
+### Plugin (recommended for TUI)
+
+The installer drops a local plugin in `~/.config/opencode/plugins/peon-opencode.js`. Restart opencode to load it.
+
+The plugin listens for `session.created`, `session.completed`, `session.idle`, `session.error`, `permission.asked`, and `tool.execute.after` (errors only) and triggers the hook.
+
+### Listener (for serve/web)
+
+```bash
+OPENCODE_SERVER_URL=http://127.0.0.1:<port> ~/.opencode/hooks/peon-ping/peon-opencode-listener.py
+```
+
+If you know the server port you can set `OPENCODE_SERVER_PORT` instead. The listener also tries to auto-discover the port on Linux.
+
+If opencode is not exposing a TCP server, start it with an explicit port, for example:
+
+```bash
+opencode --port 6677
+```
+
+Then run:
+
+```bash
+OPENCODE_SERVER_PORT=6677 ~/.opencode/hooks/peon-ping/peon-opencode-listener.py
+```
+
+If you want to wire it manually (future versions), set:
 
 ```json
 {
@@ -86,6 +114,7 @@ Edit `~/.opencode/hooks/peon-ping/config.json`:
   "enabled": true,
   "volume": 0.5,
   "active_pack": "peon",
+  "audio_player": "paplay",
   "pack_rotation": [],
   "annoyed_threshold": 3,
   "annoyed_window_seconds": 10,
@@ -107,6 +136,7 @@ Edit `~/.opencode/hooks/peon-ping/config.json`:
 - `PEON_CONFIG`: config path override
 - `PEON_STATE`: state path override
 - `PEON_PACKS_DIR`: packs directory override
+- `PEON_AUDIO_PLAYER`: force audio backend on Linux (`paplay`, `ffplay`, `aplay`, `mpg123`, `ogg123`); overrides `audio_player` in config
 
 ## Linux requirements
 

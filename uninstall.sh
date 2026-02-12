@@ -4,6 +4,7 @@ set -euo pipefail
 
 INSTALL_DIR="${PEON_DIR:-$HOME/.opencode/hooks/peon-ping}"
 CONFIG_PATH="${OPENCODE_CONFIG:-$HOME/.config/opencode/opencode.json}"
+CONFIG_DIR="${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}"
 
 if [ -f "$CONFIG_PATH" ]; then
   python3 -c "
@@ -40,6 +41,11 @@ fi
 if [ -d "$INSTALL_DIR" ]; then
   rm -rf "$INSTALL_DIR"
   echo "Removed $INSTALL_DIR"
+fi
+
+if [ -f "$CONFIG_DIR/plugins/peon-opencode.js" ]; then
+  rm -f "$CONFIG_DIR/plugins/peon-opencode.js"
+  echo "Removed $CONFIG_DIR/plugins/peon-opencode.js"
 fi
 
 echo "Uninstall complete"
