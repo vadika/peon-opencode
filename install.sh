@@ -62,6 +62,7 @@ fi
 mkdir -p "$INSTALL_DIR"
 
 cp "$SCRIPT_DIR/peon-opencode.sh" "$INSTALL_DIR/"
+cp "$SCRIPT_DIR/peon-opencode-core.py" "$INSTALL_DIR/"
 cp "$SCRIPT_DIR/VERSION" "$INSTALL_DIR/"
 mkdir -p "$CONFIG_DIR/plugins"
 cp "$SCRIPT_DIR/peon-opencode-plugin.js" "$CONFIG_DIR/plugins/peon-opencode.js"
@@ -74,6 +75,7 @@ mkdir -p "$INSTALL_DIR/packs"
 cp -r "$SCRIPT_DIR/packs/"* "$INSTALL_DIR/packs/"
 
 chmod +x "$INSTALL_DIR/peon-opencode.sh"
+chmod +x "$INSTALL_DIR/peon-opencode-core.py"
 
 python3 -c "
 import json, os

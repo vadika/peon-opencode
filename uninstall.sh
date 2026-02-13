@@ -13,7 +13,10 @@ config_path = os.path.expanduser('$CONFIG_PATH')
 hook_cmd = os.path.expanduser('$INSTALL_DIR/peon-opencode.sh')
 
 with open(config_path) as f:
-    config = json.load(f)
+    try:
+        config = json.load(f)
+    except Exception:
+        config = {}
 
 experimental = config.get('experimental', {})
 hooks = experimental.get('hook', {})
