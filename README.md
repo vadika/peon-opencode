@@ -1,88 +1,94 @@
 # peon-opencode
 
-Voice line hooks for opencode with Linux, macOS, and WSL support. Inspired by https://peon-ping.vercel.app/ project.
+Voice lines for OpenCode sessions on Linux, macOS, and WSL.
 
-This is a refactor of peon-ping to work in a generic hook runner. The hook script reads a JSON event from stdin and plays a matching voice line, sets a terminal title, and optionally sends a desktop notification.
+This project installs a hook script and plugin that react to OpenCode events, play matching sounds, update terminal title, and optionally send desktop notifications.
 
-## Install (local clone)
+Inspired by https://peon-ping.vercel.app/.
+
+## Install
+
+### One-liner (curl | bash)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vadika/peon-opencode/master/install.sh | bash
+```
+
+Optional installer overrides:
+
+- `PEON_REPO` (default: `vadika/peon-opencode`)
+- `PEON_REF` (default: `master`)
+- `PEON_ARCHIVE_URL` (advanced override for the source tarball URL)
+
+Example (install from a different branch):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vadika/peon-opencode/master/install.sh | PEON_REF=feature/my-branch bash
+```
+
+### Local clone
 
 ```bash
 bash install.sh
 ```
 
-This copies files into `~/.opencode/hooks/peon-ping` by default and updates `~/.config/opencode/opencode.json` to register the hook for future versions. Override with `PEON_DIR` and `OPENCODE_CONFIG` if your setup uses different locations.
+By default this installs to:
 
-To remove:
+- hook dir: `~/.opencode/hooks/peon-ping`
+- OpenCode config: `~/.config/opencode/opencode.json`
+- plugin file: `~/.config/opencode/plugins/peon-opencode.js`
+
+## Uninstall
+
+From a local clone:
 
 ```bash
 bash uninstall.sh
 ```
 
-## Hook usage
-
-The installer registers a hook under `experimental.hook.session_completed`, but opencode 1.1.x ignores this config. For current versions, use the plugin.
-
-### Plugin (recommended for TUI)
-
-The installer drops a local plugin in `~/.config/opencode/plugins/peon-opencode.js`. Restart opencode to load it.
-
-The plugin listens for `session.created`, `session.completed`, `session.idle`, `session.error`, `permission.asked`, and `tool.execute.after` (errors only) and triggers the hook.
-
-If you want to wire it manually (future versions), set:
-
-```json
-{
-  "experimental": {
-    "hook": {
-      "session_completed": [
-        {
-          "command": ["~/.opencode/hooks/peon-ping/peon-opencode.sh"]
-        }
-      ]
-    }
-  }
-}
-```
-
-The hook reads a JSON payload from stdin. It accepts either flat fields or opencode-style `payload` events:
+Or one-liner:
 
 ```bash
-~/.opencode/hooks/peon-ping/peon-opencode.sh
+curl -fsSL https://raw.githubusercontent.com/vadika/peon-opencode/master/uninstall.sh | bash
 ```
 
-Example payloads:
+## How it works
 
-```json
-{"event":"session_start","cwd":"/path/to/project","session_id":"abc"}
-```
+- `peon-opencode-plugin.js` listens to OpenCode events and forwards payloads to the hook.
+- `peon-opencode.sh` handles platform-specific playback/notifications and CLI controls.
+- `peon-opencode-core.py` handles event parsing, pack selection, and state updates.
 
-```json
-{"event":"task_complete","cwd":"/path/to/project","session_id":"abc"}
-```
+The installer also registers `experimental.hook.session_completed` in OpenCode config for compatibility, but plugin mode is the recommended path for current OpenCode TUI usage.
+
+## OpenCode events mapped
+
+Plugin emits or forwards these events:
+
+- `session.created`
+- `session.completed`
+- `session.idle`
+- `session.error` (mapped to hook `error`)
+- `permission.asked` (mapped to hook `permission_request`)
+- `tool.execute.after` failures (mapped to hook `tool_error`)
+
+Hook also accepts direct JSON events on stdin, including payload-style input.
+
+Example:
 
 ```json
 {"payload":{"type":"session.completed","properties":{"directory":"/path/to/project","sessionID":"abc"}}}
 ```
 
-Supported event aliases:
-
-- session_start: `SessionStart`, `session_start`, `start`, `session`
-- prompt_submit: `UserPromptSubmit`, `prompt_submit`, `prompt`, `user_prompt`
-- task_complete: `Stop`, `task_complete`, `task_done`, `complete`, `finished`, `session.completed`
-- permission_request: `PermissionRequest`, `permission_request`, `permission`, `needs_permission`
-- notification: `Notification`, `notification` (use `notification_type` for `permission_prompt`, `idle_prompt`, `resource_limit`)
-- error: `error`, `failure`, `tool_error`, `posttoolusefailure`, `task_error`
-
 ## CLI controls
 
 ```bash
-peon-opencode.sh --pause
-peon-opencode.sh --resume
-peon-opencode.sh --toggle
-peon-opencode.sh --status
-peon-opencode.sh --packs
-peon-opencode.sh --pack <name>
-peon-opencode.sh --pack
+~/.opencode/hooks/peon-ping/peon-opencode.sh --pause
+~/.opencode/hooks/peon-ping/peon-opencode.sh --resume
+~/.opencode/hooks/peon-ping/peon-opencode.sh --toggle
+~/.opencode/hooks/peon-ping/peon-opencode.sh --status
+~/.opencode/hooks/peon-ping/peon-opencode.sh --packs
+~/.opencode/hooks/peon-ping/peon-opencode.sh --pack <name>
+~/.opencode/hooks/peon-ping/peon-opencode.sh --pack
 ```
 
 ## Configuration
@@ -110,20 +116,37 @@ Edit `~/.opencode/hooks/peon-ping/config.json`:
 }
 ```
 
-## Environment overrides
+## Environment variables
 
-- `PEON_DIR`: base install directory (default `~/.opencode/hooks/peon-ping`)
+Runtime:
+
+- `PEON_DIR`: base directory (default `~/.opencode/hooks/peon-ping`)
 - `PEON_CONFIG`: config path override
-- `PEON_STATE`: state path override
+- `PEON_STATE`: state file path override
 - `PEON_PACKS_DIR`: packs directory override
-- `PEON_AUDIO_PLAYER`: force audio backend on Linux (`paplay`, `ffplay`, `aplay`, `mpg123`, `ogg123`); overrides `audio_player` in config
+- `PEON_CORE_PY`: override path to `peon-opencode-core.py`
+- `PEON_AUDIO_PLAYER`: force Linux backend (`paplay`, `ffplay`, `aplay`, `mpg123`, `ogg123`)
+- `PEON_DEBUG=1`: enable debug logging
+- `PEON_DEBUG_LOG`: debug log path
 
-## Linux requirements
+Installer/uninstaller:
+
+- `PEON_DIR`
+- `OPENCODE_CONFIG`
+- `OPENCODE_CONFIG_DIR`
+
+Plugin:
+
+- `PEON_HOOK_CMD`: override hook command path
+- `PEON_DEBUG=1`
+- `PEON_DEBUG_LOG`
+
+## Requirements
 
 - `python3`
-- Audio playback: one of `ffplay`, `paplay`, `aplay`, `mpg123`, `ogg123`
-- Notifications: `notify-send` (optional)
-- Focus detection: `xdotool` (optional)
+- Linux audio: one of `ffplay`, `paplay`, `aplay`, `mpg123`, `ogg123`
+- Linux notifications: `notify-send` (optional)
+- Linux focus detection: `xdotool` (optional, X11)
 
 ## License
 
