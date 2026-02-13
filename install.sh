@@ -5,6 +5,9 @@ set -euo pipefail
 INSTALL_DIR="${PEON_DIR:-$HOME/.opencode/hooks/peon-ping}"
 CONFIG_PATH="${OPENCODE_CONFIG:-$HOME/.config/opencode/opencode.json}"
 CONFIG_DIR="${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}"
+PEON_REPO="${PEON_REPO:-vadika/peon-opencode}"
+PEON_REF="${PEON_REF:-master}"
+PEON_ARCHIVE_URL="${PEON_ARCHIVE_URL:-https://codeload.github.com/$PEON_REPO/tar.gz/refs/heads/$PEON_REF}"
 
 detect_platform() {
   case "$(uname -s)" in
@@ -44,14 +47,61 @@ fi
 SCRIPT_DIR=""
 if [ -n "${BASH_SOURCE[0]:-}" ] && [ "${BASH_SOURCE[0]}" != "bash" ]; then
   CANDIDATE="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-  if [ -f "$CANDIDATE/peon-opencode.sh" ]; then
+  if [ -f "$CANDIDATE/peon-opencode.sh" ] && [ -f "$CANDIDATE/packs/peon/manifest.json" ]; then
     SCRIPT_DIR="$CANDIDATE"
   fi
 fi
 
-if [ -z "$SCRIPT_DIR" ]; then
-  echo "Error: installer must be run from a local clone"
-  exit 1
+have_cmd() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+download_file() {
+  local url="$1" out="$2"
+  if have_cmd curl; then
+    curl -fsSL "$url" -o "$out"
+  elif have_cmd wget; then
+    wget -qO "$out" "$url"
+  else
+    echo "Error: curl or wget is required to download installer assets"
+    exit 1
+  fi
+}
+
+TMP_DIR=""
+SOURCE_DIR=""
+cleanup() {
+  if [ -n "$TMP_DIR" ] && [ -d "$TMP_DIR" ]; then
+    rm -rf "$TMP_DIR"
+  fi
+}
+trap cleanup EXIT
+
+if [ -n "$SCRIPT_DIR" ]; then
+  SOURCE_DIR="$SCRIPT_DIR"
+else
+  TMP_DIR="$(mktemp -d)"
+  ARCHIVE="$TMP_DIR/src.tar.gz"
+  EXTRACT_DIR="$TMP_DIR/src"
+  mkdir -p "$EXTRACT_DIR"
+
+  echo "Downloading $PEON_REPO ($PEON_REF)..."
+  if ! download_file "$PEON_ARCHIVE_URL" "$ARCHIVE"; then
+    echo "Error: failed to download repository archive from $PEON_ARCHIVE_URL"
+    exit 1
+  fi
+
+  if ! tar -xzf "$ARCHIVE" -C "$EXTRACT_DIR" --strip-components=1; then
+    echo "Error: failed to extract repository archive"
+    exit 1
+  fi
+
+  if [ ! -f "$EXTRACT_DIR/peon-opencode.sh" ] || [ ! -f "$EXTRACT_DIR/packs/peon/manifest.json" ]; then
+    echo "Error: downloaded archive is missing required files"
+    exit 1
+  fi
+
+  SOURCE_DIR="$EXTRACT_DIR"
 fi
 
 UPDATING=false
@@ -61,18 +111,18 @@ fi
 
 mkdir -p "$INSTALL_DIR"
 
-cp "$SCRIPT_DIR/peon-opencode.sh" "$INSTALL_DIR/"
-cp "$SCRIPT_DIR/peon-opencode-core.py" "$INSTALL_DIR/"
-cp "$SCRIPT_DIR/VERSION" "$INSTALL_DIR/"
+cp "$SOURCE_DIR/peon-opencode.sh" "$INSTALL_DIR/"
+cp "$SOURCE_DIR/peon-opencode-core.py" "$INSTALL_DIR/"
+cp "$SOURCE_DIR/VERSION" "$INSTALL_DIR/"
 mkdir -p "$CONFIG_DIR/plugins"
-cp "$SCRIPT_DIR/peon-opencode-plugin.js" "$CONFIG_DIR/plugins/peon-opencode.js"
+cp "$SOURCE_DIR/peon-opencode-plugin.js" "$CONFIG_DIR/plugins/peon-opencode.js"
 
 if [ ! -f "$INSTALL_DIR/config.json" ]; then
-  cp "$SCRIPT_DIR/config.json" "$INSTALL_DIR/"
+  cp "$SOURCE_DIR/config.json" "$INSTALL_DIR/"
 fi
 
 mkdir -p "$INSTALL_DIR/packs"
-cp -r "$SCRIPT_DIR/packs/"* "$INSTALL_DIR/packs/"
+cp -r "$SOURCE_DIR/packs/"* "$INSTALL_DIR/packs/"
 
 chmod +x "$INSTALL_DIR/peon-opencode.sh"
 chmod +x "$INSTALL_DIR/peon-opencode-core.py"

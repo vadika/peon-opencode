@@ -5,6 +5,7 @@ set -euo pipefail
 INSTALL_DIR="${PEON_DIR:-$HOME/.opencode/hooks/peon-ping}"
 CONFIG_PATH="${OPENCODE_CONFIG:-$HOME/.config/opencode/opencode.json}"
 CONFIG_DIR="${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}"
+PLUGIN_PATH="$CONFIG_DIR/plugins/peon-opencode.js"
 
 if [ -f "$CONFIG_PATH" ]; then
   python3 -c "
@@ -18,11 +19,31 @@ with open(config_path) as f:
     except Exception:
         config = {}
 
-experimental = config.get('experimental', {})
-hooks = experimental.get('hook', {})
-session_completed = hooks.get('session_completed', [])
+if not isinstance(config, dict):
+    config = {}
 
-filtered = [e for e in session_completed if e.get('command') != [hook_cmd]]
+experimental = config.get('experimental', {})
+if not isinstance(experimental, dict):
+    experimental = {}
+hooks = experimental.get('hook', {})
+if not isinstance(hooks, dict):
+    hooks = {}
+session_completed = hooks.get('session_completed', [])
+if not isinstance(session_completed, list):
+    session_completed = []
+
+def normalize_command(entry):
+    if isinstance(entry, dict):
+        cmd = entry.get('command')
+    else:
+        return None
+    if isinstance(cmd, list) and cmd:
+        cmd = cmd[0]
+    if not isinstance(cmd, str):
+        return None
+    return os.path.expanduser(cmd)
+
+filtered = [e for e in session_completed if normalize_command(e) != hook_cmd]
 if filtered != session_completed:
     if filtered:
         hooks['session_completed'] = filtered
@@ -46,9 +67,9 @@ if [ -d "$INSTALL_DIR" ]; then
   echo "Removed $INSTALL_DIR"
 fi
 
-if [ -f "$CONFIG_DIR/plugins/peon-opencode.js" ]; then
-  rm -f "$CONFIG_DIR/plugins/peon-opencode.js"
-  echo "Removed $CONFIG_DIR/plugins/peon-opencode.js"
+if [ -f "$PLUGIN_PATH" ]; then
+  rm -f "$PLUGIN_PATH"
+  echo "Removed $PLUGIN_PATH"
 fi
 
 echo "Uninstall complete"
